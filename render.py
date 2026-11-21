@@ -1,145 +1,366 @@
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
-import math, random
+"""Render an open passport spread for the invented Republic of Ostravia.
+
+The issuing state renamed itself the Republic of Ostra on 1 January 2024,
+midway through this document's validity. The data page still carries the
+old name; the bearer's own border stamps at Karst Pass switch from
+OSTRAVIA (2022-2023) to OSTRA (2024-2025). No caption explains it.
+"""
+
+import math
+import random
+from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+RNG = random.Random(20240314)
+HERE = Path(__file__).resolve().parent
+OUT = HERE / "entry.png"
 
 W = H = 1024
-random.seed(7)
-img = Image.new("RGB", (W, H), (58, 62, 66))
-d = ImageDraw.Draw(img, "RGBA")
-# desk texture
-for _ in range(2600):
-    x, y = random.randrange(W), random.randrange(H)
-    v = random.randrange(-8, 9)
-    d.point((x, y), fill=(58+v, 62+v, 66+v))
-# book shadow + pages
-d.rounded_rectangle([62, 88, 962, 936], 10, fill=(30, 30, 32))
-d.rounded_rectangle([52, 78, 972, 926], 10, fill=(238, 240, 236))
-# centre fold shading
-for i in range(26):
-    a = int(70 * (1 - i/26))
-    d.line([(512-i, 84), (512-i, 920)], fill=(120, 125, 120, a))
-    d.line([(512+i, 84), (512+i, 920)], fill=(255, 255, 255, a//2))
-d.line([(512, 80), (512, 924)], fill=(150, 152, 148), width=2)
+DESK = (36, 44, 50)
+PAPER_L = (229, 235, 239)
+PAPER_R = (241, 238, 227)
+INK = (23, 33, 62)
+LABEL = (104, 112, 121)
+GUIL_A = (146, 178, 204)
+GUIL_B = (168, 202, 176)
+STAMP_BLUE = (28, 68, 158)
+STAMP_GREEN = (18, 116, 78)
+STAMP_RED = (168, 38, 48)
+STAMP_PURPLE = (88, 48, 138)
 
-F = "/usr/share/fonts/truetype/dejavu/"
-def f(name, s): return ImageFont.truetype(F+name, s)
-sans, sansb = "DejaVuSans.ttf", "DejaVuSans-Bold.ttf"
-serifb, mono = "DejaVuSerif-Bold.ttf", "DejaVuSansMono.ttf"
-navy = (18, 38, 74); ink = (28, 30, 34); grey = (105, 108, 112)
+FONT_DIR = Path("/usr/share/fonts/truetype/dejavu")
 
-def guilloche(cx, cy, r, col):
-    for k in range(7):
-        rr = r - k*7
-        d.ellipse([cx-rr, cy-rr*0.62, cx+rr, cy+rr*0.62], outline=col+(38,), width=1)
-guilloche(282, 520, 210, (90, 150, 170))
-guilloche(742, 500, 200, (120, 160, 140))
-for x in range(70, 955, 14):
-    d.line([(x, 96), (x+60, 910)], fill=(120, 170, 185, 14), width=1)
 
-# ---- LEFT: data page ----
-LX = 84
-d.text((LX, 104), "REPUBLIC OF SORAVIA", font=f(serifb, 25), fill=navy)
-d.text((LX, 134), "SORAVIAN PASSPORT  ·  PASS", font=f(sansb, 12), fill=grey)
-# small crest: anchor in circle
-d.ellipse([448, 100, 488, 140], outline=navy, width=2)
-d.text((458, 108), "S", font=f(serifb, 22), fill=navy)
-d.line([(LX, 158), (488, 158)], fill=navy, width=2)
+def font(size, kind="sans"):
+    names = {
+        "sans": "DejaVuSans.ttf",
+        "bold": "DejaVuSans-Bold.ttf",
+        "serif": "DejaVuSerif.ttf",
+        "serifbold": "DejaVuSerif-Bold.ttf",
+        "mono": "DejaVuSansMono.ttf",
+        "monobold": "DejaVuSansMono-Bold.ttf",
+    }
+    return ImageFont.truetype(str(FONT_DIR / names[kind]), size)
 
-# portrait box
-px0, py0, px1, py1 = LX, 176, 228, 356
-d.rectangle([px0, py0, px1, py1], fill=(203, 214, 220), outline=(70, 80, 90), width=2)
-# portrait: woman, dark tied hair, navy uniform
-cx = (px0+px1)//2
-d.ellipse([cx-34, py0+22, cx+34, py0+108], fill=(232, 196, 168))          # face
-d.pieslice([cx-38, py0+10, cx+38, py0+86], 180, 360, fill=(38, 30, 26))    # hair top
-d.rectangle([cx-38, py0+44, cx-28, py0+104], fill=(38, 30, 26))
-d.rectangle([cx+28, py0+44, cx+38, py0+104], fill=(38, 30, 26))
-d.ellipse([cx-14, py0+58, cx-6, py0+66], fill=(30, 26, 24))               # eyes
-d.ellipse([cx+6, py0+58, cx+14, py0+66], fill=(30, 26, 24))
-d.line([(cx-10, py0+84), (cx+10, py0+84)], fill=(150, 90, 80), width=2)   # mouth
-d.polygon([(px0+8, py1), (cx-40, py0+118), (cx+40, py0+118), (px1-8, py1)], fill=(24, 42, 78))  # uniform
-d.polygon([(cx-12, py0+118), (cx+12, py0+118), (cx, py0+142)], fill=(240, 240, 238))             # shirt V
-d.rectangle([cx-44, py0+128, cx-30, py0+136], fill=(212, 175, 55))        # epaulette L
-d.rectangle([cx+30, py0+128, cx+44, py0+136], fill=(212, 175, 55))        # epaulette R
-d.text((px0+2, py1+6), "KORVANE, E. M.", font=f(sans, 10), fill=grey)
 
-fields = [
-    ("Surname / Etternamn", "KORVANE"),
-    ("Given names / Fornamn", "ELENA MIRA"),
-    ("Date of birth / Fodselsdato", "14 MAR 1992"),
-    ("Place of birth / Fodestad", "SORAVIA CITY"),
-    ("Sex / Kjonn", "F"),
-    ("Nationality / Nasjonalitet", "SORAVIAN"),
-    ("Passport No / Passnr", "SOR8847392"),
-    ("Date of issue / Utferda", "03 JUN 2021"),
-    ("Date of expiry / Gyldig til", "02 JUN 2031"),
-    ("Authority / Styresmakt", "MINISTRY OF THE INTERIOR"),
-    ("Occupation / Yrke", "FERRY OFFICER"),
-]
-fx, fy = 244, 176
-for label, val in fields:
-    d.text((fx, fy), label, font=f(sans, 9), fill=grey)
-    d.text((fx, fy+12), val, font=f(sansb, 13), fill=ink)
-    fy += 38
-# endorsement — the telling detail
-d.rectangle([LX, 612, 488, 676], outline=(150, 60, 50), width=2)
-d.text((LX+10, 620), "ENDORSEMENT / MERKNAD", font=f(sansb, 11), fill=(150, 60, 50))
-d.text((LX+10, 636), "Valid for maritime travel only within", font=f(sans, 12), fill=ink)
-d.text((LX+10, 650), "the Soravian Archipelago. Air travel", font=f(sans, 12), fill=ink)
-d.text((LX+10, 664), "requires separate endorsement.", font=f(sans, 12), fill=ink)
-# signature squiggle + fee stamp
-d.text((LX, 692), "Holder's signature", font=f(sans, 9), fill=grey)
-pts = [(LX+4+i*3, 722 + int(9*math.sin(i/2.6))) for i in range(44)]
-d.line(pts, fill=(30, 40, 90), width=2)
-d.rectangle([352, 690, 488, 736], outline=(40, 90, 140), width=2)
-d.text((362, 698), "FEE PAID  40 SOR", font=f(sansb, 12), fill=(40, 90, 140))
-d.text((362, 716), "03 JUN 2021 · SORAVIA CITY", font=f(sans, 9), fill=(40, 90, 140))
-# MRZ
-d.rectangle([LX, 760, 488, 830], fill=(245, 246, 244), outline=(170, 172, 168))
-d.text((LX+8, 770), "P<SOR<KORVANE<<ELENA<MIRA<<<<<<<<<<<<", font=f(mono, 14), fill=ink)
-d.text((LX+8, 794), "SOR8847392SOR9203144F3106024<<<<<<<<<", font=f(mono, 14), fill=ink)
-d.text((LX, 844), "If found, return to the nearest Soravian harbour office.", font=f(sans, 10), fill=grey)
+def add_noise(img, strength=9, seed=7):
+    rng = random.Random(seed)
+    px = img.load()
+    w, h = img.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b = px[x, y][:3]
+            n = rng.randint(-strength, strength)
+            px[x, y] = (max(0, min(255, r + n)), max(0, min(255, g + n)),
+                        max(0, min(255, b + n)))
+    return img
 
-# ---- RIGHT: visas / stamps ----
-RX = 536
-d.text((RX, 104), "VISAS / VISUM", font=f(serifb, 22), fill=navy)
-d.line([(RX, 138), (940, 138)], fill=navy, width=2)
-d.text((RX, 148), "Entry and exit stamps · Inn- og utreise", font=f(sans, 11), fill=grey)
 
-def stamp(x, y, w, h, lines, col, angle, oval=False):
-    s = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(s)
+def vgrad(size, top, bottom):
+    w, h = size
+    base = Image.new("RGB", (1, h))
+    for y in range(h):
+        t = y / max(1, h - 1)
+        base.putpixel((0, y), tuple(int(top[i] + (bottom[i] - top[i]) * t)
+                                     for i in range(3)))
+    return base.resize((w, h))
+
+
+def guilloche(img, box, color, phase=0.0, amp=7.0, step=9):
+    """Fine interlaced sine lines clipped to box, low alpha."""
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    x0, y0, x1, y1 = box
+    for yy in range(y0, y1, step):
+        pts = []
+        for xx in range(x0, x1, 4):
+            pts.append((xx, yy + amp * math.sin((xx - x0) / 26.0 + phase
+                                                 + yy / 41.0)))
+        d.line(pts, fill=color + (46,), width=1)
+    for xx in range(x0, x1, step * 2):
+        pts = []
+        for yy in range(y0, y1, 4):
+            pts.append((xx + amp * 0.7 * math.cos((yy - y0) / 30.0 + phase),
+                        yy))
+        d.line(pts, fill=color + (30,), width=1)
+    img.alpha_composite(layer)
+
+
+def portrait(box):
+    """Shaded studio portrait: gradient backdrop, soft facial shading."""
+    x0, y0, x1, y1 = box
+    w, h = x1 - x0, y1 - y0
+    pic = vgrad((w, h), (196, 208, 220), (138, 155, 176)).convert("RGBA")
+    d = ImageDraw.Draw(pic)
+    cx = w // 2
+    skin = (196, 152, 120)
+    skin_dark = (158, 112, 84)
+    skin_light = (222, 182, 148)
+    hair = (52, 40, 32)
+    jacket = (44, 50, 66)
+    # shoulders / jacket
+    d.ellipse([cx - w * 0.52, h * 0.66, cx + w * 0.52, h * 1.25], fill=jacket)
+    d.polygon([(cx - 16, h * 0.70), (cx + 16, h * 0.70), (cx, h * 0.92)],
+              fill=(228, 228, 224))  # shirt V
+    # neck
+    d.rectangle([cx - 13, h * 0.52, cx + 13, h * 0.72], fill=skin_dark)
+    # head with offset highlight for shading
+    d.ellipse([cx - 34, h * 0.10, cx + 34, h * 0.58], fill=skin)
+    d.ellipse([cx - 30, h * 0.12, cx + 14, h * 0.52], fill=skin_light)
+    d.ellipse([cx + 12, h * 0.18, cx + 34, h * 0.54], fill=skin_dark)
+    # ears
+    d.ellipse([cx - 39, h * 0.32, cx - 31, h * 0.44], fill=skin_dark)
+    d.ellipse([cx + 31, h * 0.32, cx + 39, h * 0.44], fill=skin_dark)
+    # hair cap
+    d.pieslice([cx - 36, h * 0.06, cx + 36, h * 0.40], 180, 360, fill=hair)
+    d.rectangle([cx - 36, h * 0.20, cx - 30, h * 0.34], fill=hair)
+    d.rectangle([cx + 30, h * 0.20, cx + 36, h * 0.34], fill=hair)
+    # brows, eyes, nose shadow, mouth
+    d.line([(cx - 22, h * 0.33), (cx - 8, h * 0.315)], fill=hair, width=3)
+    d.line([(cx + 8, h * 0.315), (cx + 22, h * 0.33)], fill=hair, width=3)
+    d.ellipse([cx - 19, h * 0.365, cx - 10, h * 0.395], fill=(38, 30, 26))
+    d.ellipse([cx + 10, h * 0.365, cx + 19, h * 0.395], fill=(38, 30, 26))
+    d.line([(cx + 1, h * 0.40), (cx - 2, h * 0.47)], fill=skin_dark, width=2)
+    d.line([(cx - 11, h * 0.515), (cx + 11, h * 0.515)], fill=(120, 72, 58),
+           width=2)
+    # jaw shading + stubble speckle
+    d.arc([cx - 28, h * 0.38, cx + 28, h * 0.60], 20, 160, fill=skin_dark,
+          width=2)
+    for _ in range(260):
+        sx = cx + RNG.randint(-24, 24)
+        sy = int(h * RNG.uniform(0.46, 0.57))
+        d.point((sx, sy), fill=(96, 70, 52))
+    pic = pic.filter(ImageFilter.GaussianBlur(1.1))
+    return add_noise(pic.convert("RGB"), strength=6, seed=11).convert("RGBA")
+
+
+def stamp(img, cx, cy, w, h, lines, color, angle, oval=False, alpha=205):
+    """Ink stamp: double border, centered lines, rotated, uneven alpha."""
+    sw, sh = w + 30, h + 30
+    layer = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    box = [15, 15, sw - 15, sh - 15]
     if oval:
-        sd.ellipse([2, 2, w-3, h-3], outline=col+(210,), width=3)
-        sd.ellipse([10, 10, w-11, h-11], outline=col+(150,), width=1)
+        d.ellipse(box, outline=color + (alpha,), width=3)
+        d.ellipse([box[0] + 5, box[1] + 5, box[2] - 5, box[3] - 5],
+                  outline=color + (alpha - 40,), width=1)
     else:
-        sd.rounded_rectangle([2, 2, w-3, h-3], 6, outline=col+(210,), width=3)
-        sd.rounded_rectangle([9, 9, w-10, h-10], 4, outline=col+(150,), width=1)
-    ty = 16
-    for i, (t, sz, b) in enumerate(lines):
-        fo = f(sansb if b else sans, sz)
-        tw = sd.textlength(t, font=fo)
-        sd.text(((w-tw)/2, ty), t, font=fo, fill=col+(215,))
-        ty += sz + 5
-    s = s.rotate(angle, expand=True, resample=Image.BICUBIC)
-    img.paste(s, (x, y), s)
+        d.rounded_rectangle(box, 8, outline=color + (alpha,), width=3)
+        d.rounded_rectangle([box[0] + 5, box[1] + 5, box[2] - 5, box[3] - 5],
+                            6, outline=color + (alpha - 40,), width=1)
+    total = sum(sz + 3 for _, sz in lines)
+    ty = (sh - total) // 2
+    for text, sz in lines:
+        f = font(sz, "bold")
+        tw = d.textlength(text, font=f)
+        d.text(((sw - tw) / 2, ty), text, font=f, fill=color + (alpha,))
+        ty += sz + 3
+    # ink wear: erase sparse speckles
+    px = layer.load()
+    for _ in range(240):
+        x, y = RNG.randrange(sw), RNG.randrange(sh)
+        if px[x, y][3] > 0:
+            px[x, y] = (0, 0, 0, 0)
+    layer = layer.rotate(angle, expand=True, resample=Image.BICUBIC)
+    img.alpha_composite(layer, (int(cx - layer.width / 2),
+                                int(cy - layer.height / 2)))
 
-blue, green, black = (30, 70, 150), (25, 110, 70), (35, 35, 40)
-stamp(556, 196, 176, 104, [("KESTREL ISLES", 13, True), ("ENTRY", 11, False), ("18 SEP 2022", 14, True), ("PORT SAREN", 10, False)], blue, -6)
-stamp(752, 210, 176, 104, [("KESTREL ISLES", 13, True), ("EXIT", 11, False), ("02 OCT 2022", 14, True), ("PORT SAREN", 10, False)], blue, 4)
-stamp(570, 356, 190, 104, [("TAVARIA", 14, True), ("ADMITTED · 30 DAYS", 10, False), ("11 MAY 2023", 14, True), ("KELD HAVEN FERRY", 10, False)], green, 3, oval=True)
-stamp(766, 372, 176, 104, [("TAVARIA", 14, True), ("DEPARTED", 11, False), ("28 MAY 2023", 14, True), ("KELD HAVEN", 10, False)], green, -4, oval=True)
-stamp(556, 518, 176, 104, [("MIRLAND", 14, True), ("ENTRY BY SEA", 10, False), ("07 JAN 2024", 14, True), ("NORDHAVN PIER 4", 10, False)], black, -3)
-stamp(750, 532, 190, 104, [("MIRLAND", 14, True), ("EXIT · CREW LIST 118", 9, False), ("19 JAN 2024", 14, True), ("NORDHAVN", 10, False)], black, 5)
-# harbour dues sticker
-d.rectangle([556, 682, 760, 742], fill=(250, 244, 214), outline=(160, 140, 60), width=2)
-d.text((566, 690), "HARBOUR DUES PAID", font=f(sansb, 12), fill=(120, 100, 30))
-d.text((566, 708), "12 SOR · 07 JAN 2024 · NORDHAVN", font=f(sans, 10), fill=(120, 100, 30))
-d.text((566, 724), "Soravian Archipelago Free Movement Zone", font=f(sans, 9), fill=(120, 100, 30))
-d.text((RX, 770), "This passport remains the property of the", font=f(sans, 11), fill=grey)
-d.text((RX, 788), "Republic of Soravia.", font=f(sans, 11), fill=grey)
-d.text((RX, 876), "Page 7", font=f(sans, 10), fill=grey)
-d.text((452, 876), "Page 6", font=f(sans, 10), fill=grey)
 
-img = img.filter(ImageFilter.GaussianBlur(0.4))
-img.save("/home/hatch/workspace/makefun/the-passport-page-of-a-countr-2-20261121-0318-entry-v2/entry.png", optimize=True)
-print("saved", img.size)
+def emblem(d, cx, cy, r):
+    """Simple shield-and-star coat of arms."""
+    gold = (150, 118, 44)
+    d.polygon([(cx - r, cy - r), (cx + r, cy - r), (cx + r, cy + r * 0.2),
+               (cx, cy + r), (cx - r, cy + r * 0.2)], outline=gold, width=2)
+    pts = []
+    for i in range(10):
+        ang = -math.pi / 2 + i * math.pi / 5
+        rad = r * 0.55 if i % 2 == 0 else r * 0.24
+        pts.append((cx + rad * math.cos(ang), cy + rad * math.sin(ang)))
+    d.polygon(pts, fill=gold)
+
+
+def hologram(img, cx, cy, r):
+    """Rainbow foil disc overlapping the photo corner."""
+    layer = Image.new("RGBA", (r * 2, r * 2), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    hues = [(220, 90, 90), (230, 170, 70), (150, 210, 110), (90, 180, 220),
+            (140, 120, 230), (220, 110, 190)]
+    for i in range(36):
+        d.pieslice([0, 0, r * 2, r * 2], i * 10, i * 10 + 11,
+                   fill=hues[i % len(hues)] + (88,))
+    d.ellipse([0, 0, r * 2, r * 2], outline=(255, 255, 255, 150), width=2)
+    d.ellipse([r - 7, r - 7, r + 7, r + 7], outline=(255, 255, 255, 170),
+              width=1)
+    img.alpha_composite(layer, (cx - r, cy - r))
+
+
+def signature(d, x, y, w):
+    pts = []
+    for i in range(140):
+        t = i / 139
+        pts.append((x + t * w,
+                    y + 5 * math.sin(t * 14.0) - 9 * math.sin(t * 4.3)
+                    + 3 * math.cos(t * 26.0) - 6 * math.sin(t * 6.7)))
+    d.line(pts, fill=(30, 40, 110), width=2)
+    # a final flourish loop
+    loop = []
+    for i in range(40):
+        a = i / 39 * 2 * math.pi
+        loop.append((x + w * 0.82 + 10 * math.cos(a),
+                     y - 4 + 6 * math.sin(a)))
+    d.line(loop, fill=(30, 40, 110), width=2)
+
+
+def field(d, x, y, label, value, vw=210):
+    d.text((x, y), label, font=font(9, "sans"), fill=LABEL)
+    d.text((x, y + 12), value, font=font(13, "bold"), fill=INK)
+
+
+def build():
+    img = Image.new("RGBA", (W, H), DESK + (255,))
+    d = ImageDraw.Draw(img)
+    # desk vignette
+    vig = vgrad((W, H), (52, 62, 70), (26, 32, 38))
+    img.alpha_composite(vig.convert("RGBA"))
+    d = ImageDraw.Draw(img)
+
+    # spread geometry
+    x0, y0, x1, y1 = 72, 196, 952, 828
+    spine = (x0 + x1) // 2
+    # drop shadow
+    shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadow)
+    sd.rounded_rectangle([x0 + 10, y0 + 16, x1 + 10, y1 + 16], 10,
+                         fill=(0, 0, 0, 150))
+    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(9)))
+    d = ImageDraw.Draw(img)
+    # pages
+    d.rounded_rectangle([x0, y0, spine, y1], 8, fill=PAPER_L)
+    d.rounded_rectangle([spine, y0, x1, y1], 8, fill=PAPER_R)
+    d.rectangle([spine - 6, y0, spine + 6, y1], fill=PAPER_L)
+    d.rectangle([spine, y0, spine + 6, y1], fill=PAPER_R)
+    # spine shading
+    for i in range(26):
+        a = int(70 * (1 - i / 26))
+        d.line([(spine - i, y0 + 4), (spine - i, y1 - 4)], fill=(90, 95, 100, a))
+        d.line([(spine + i, y0 + 4), (spine + i, y1 - 4)], fill=(90, 90, 85, a))
+    # page edge lines
+    for off in (3, 6):
+        d.rounded_rectangle([x0 - off, y0 + off, spine - 2, y1 - off], 8,
+                            outline=(196, 198, 192))
+        d.rounded_rectangle([spine + 2, y0 + off, x1 + off, y1 - off], 8,
+                            outline=(202, 198, 184))
+    guilloche(img, (x0 + 8, y0 + 8, spine - 8, y1 - 8), GUIL_A, phase=0.4)
+    guilloche(img, (spine + 8, y0 + 8, x1 - 8, y1 - 8), GUIL_B, phase=2.1)
+    d = ImageDraw.Draw(img)
+
+    # ---- left page: data page ----
+    emblem(d, x0 + 44, y0 + 44, 20)
+    d.text((x0 + 76, y0 + 22), "REPUBLIC OF OSTRAVIA", font=font(21, "serifbold"),
+           fill=INK)
+    d.text((x0 + 76, y0 + 48), "OSTRAVSKA REPUBLIKA", font=font(11, "sans"),
+           fill=LABEL)
+    d.text((x0 + 76, y0 + 64), "PASSPORT  /  PAS", font=font(13, "bold"),
+           fill=INK)
+    d.line([(x0 + 24, y0 + 92), (spine - 24, y0 + 92)], fill=(150, 120, 60),
+           width=2)
+
+    photo = (x0 + 26, y0 + 112, x0 + 176, y0 + 302)
+    img.alpha_composite(portrait(photo), (photo[0], photo[1]))
+    d = ImageDraw.Draw(img)
+    d.rectangle(photo, outline=(120, 128, 138), width=2)
+    hologram(img, photo[2] - 6, photo[3] - 6, 24)
+    d = ImageDraw.Draw(img)
+    d.text((x0 + 26, photo[3] + 8), "OST4471206", font=font(11, "mono"),
+           fill=LABEL)
+
+    fx = x0 + 196
+    rows = [
+        ("TYPE / TIP", "P", "COUNTRY / DRZAVA", "OST"),
+        ("PASSPORT NO.", "OST4471206", "SURNAME / PREZIME", "VEY"),
+        ("GIVEN NAMES / IMENA", "MAREK DUSAN", "NATIONALITY", "OSTRAVIA"),
+        ("DATE OF BIRTH", "09 NOV 1988", "SEX / POL", "M"),
+        ("PLACE OF BIRTH", "KARST CITY", "OCCUPATION", "FREIGHT DRIVER"),
+        ("DATE OF ISSUE", "14 MAR 2022", "DATE OF EXPIRY", "13 MAR 2032"),
+    ]
+    fy = y0 + 112
+    for l1, v1, l2, v2 in rows:
+        field(d, fx, fy, l1, v1)
+        field(d, fx + 108, fy, l2, v2)
+        fy += 44
+    d.text((fx, fy + 2), "AUTHORITY / ORGAN", font=font(10, "sans"), fill=LABEL)
+    d.text((fx, fy + 15), "MINISTRY OF INTERIOR", font=font(14, "bold"),
+           fill=INK)
+    signature(d, x0 + 30, y1 - 118, 130)
+    d.line([(x0 + 28, y1 - 96), (x0 + 168, y1 - 96)], fill=LABEL, width=1)
+    d.text((x0 + 28, y1 - 92), "SIGNATURE OF BEARER", font=font(9, "sans"),
+           fill=LABEL)
+
+    # MRZ
+    mrz_y = y1 - 62
+    d.rectangle([x0 + 18, mrz_y - 6, spine - 18, y1 - 12],
+                fill=(240, 241, 238))
+    d.text((x0 + 26, mrz_y), "P<OSTVEY<<MAREK<DUSAN<<<<<<<<<<<<<<<<<<<<<<",
+           font=font(14, "mono"), fill=(30, 30, 34))
+    d.text((x0 + 26, mrz_y + 22), "OST4471206<8OST8811094M3203137<<<<<<<<<<<<<<08",
+           font=font(14, "mono"), fill=(30, 30, 34))
+
+    # ---- right page: stamps ----
+    d.text((spine + 36, y0 + 22), "VISAS / VIZY", font=font(15, "serifbold"),
+           fill=INK)
+    d.line([(spine + 34, y0 + 48), (x1 - 24, y0 + 48)], fill=(150, 120, 60),
+           width=2)
+    d.text((spine + 36, y0 + 56), "GRANICNI PRELAZI / BORDER CROSSINGS",
+           font=font(10, "sans"), fill=LABEL)
+
+    sx = spine + 108
+    sy = y0 + 128
+    stamp(img, sx, sy, 186, 78,
+          [("OSTRAVIA", 16), ("EXIT  22 JUN 2022", 12), ("KARST PASS", 11)],
+          STAMP_BLUE, -5)
+    stamp(img, sx + 202, sy + 6, 186, 78,
+          [("OSTRAVIA", 16), ("ENTRY  25 JUN 2022", 12), ("KARST PASS", 11)],
+          STAMP_GREEN, 4)
+    stamp(img, sx + 8, sy + 118, 186, 78,
+          [("OSTRAVIA", 16), ("EXIT  17 OCT 2023", 12), ("KARST PASS", 11)],
+          STAMP_BLUE, 3)
+    stamp(img, sx + 210, sy + 112, 186, 78,
+          [("OSTRAVIA", 16), ("ENTRY  19 OCT 2023", 12), ("KARST PASS", 11)],
+          STAMP_GREEN, -6)
+    # the state renamed itself on 1 Jan 2024: same border post, new name
+    stamp(img, sx + 4, sy + 232, 186, 78,
+          [("OSTRA", 16), ("ENTRY  08 FEB 2024", 12), ("KARST PASS", 11)],
+          STAMP_GREEN, 5)
+    stamp(img, sx + 206, sy + 238, 186, 78,
+          [("OSTRA", 16), ("EXIT  30 MAY 2025", 12), ("KARST PASS", 11)],
+          STAMP_BLUE, -4)
+    stamp(img, sx + 105, sy + 348, 192, 84,
+          [("OSTRA", 16), ("ENTRY  02 JUN 2025", 12), ("KARST PASS", 11)],
+          STAMP_GREEN, 2, oval=True)
+    d = ImageDraw.Draw(img)
+    # perforated document number along the right edge
+    for i, ch in enumerate("OST4471206"):
+        d.text((x1 - 17, y0 + 100 + i * 22), ch, font=font(11, "mono"),
+               fill=(158, 155, 146))
+    d.text((spine + 26, y1 - 34), "7", font=font(12, "serif"), fill=LABEL)
+
+    # gentle wear: soft crease + corner darkening
+    wear = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    wd = ImageDraw.Draw(wear)
+    wd.line([(x0 + 60, y1 - 30), (x0 + 210, y0 + 120)], fill=(120, 115, 95, 26),
+            width=3)
+    wd.ellipse([x1 - 120, y1 - 90, x1 + 40, y1 + 60], fill=(110, 100, 80, 22))
+    img.alpha_composite(wear.filter(ImageFilter.GaussianBlur(6)))
+
+    out = add_noise(img.convert("RGB"), strength=3, seed=23)
+    out.save(OUT, optimize=True)
+    if OUT.stat().st_size > 1_048_576:
+        # per-pixel grain defeats PNG compression; cap the palette instead
+        out.quantize(colors=256, method=Image.MEDIANCUT).save(OUT,
+                                                               optimize=True)
+    print(f"wrote {OUT} {out.size[0]}x{out.size[1]} {OUT.stat().st_size} bytes")
+
+
+if __name__ == "__main__":
+    build()
