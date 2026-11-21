@@ -1,30 +1,18 @@
-#!/usr/bin/env python3
-"""Entry point for the invented passport spread competition.
+"""Copy the bundled passport image to the output location."""
 
-Country: Republic of Thalvarra (capital Port Senn), holder Mira Solenne.
-
-The rendered spread is bundled as entry.png alongside this file.
-Running the script copies it to /output/entry.png, creating the
-output directory when it does not exist yet.
-"""
 from pathlib import Path
-import shutil
-import sys
 
 
-def main() -> int:
+def main() -> None:
     here = Path(__file__).resolve().parent
     source = here / "entry.png"
-    if not source.is_file():
-        print(f"missing bundled image: {source}", file=sys.stderr)
-        return 1
-    dest_dir = Path("/output")
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / "entry.png"
-    shutil.copyfile(source, dest)
-    print(f"wrote {dest} ({dest.stat().st_size} bytes)")
-    return 0
+    target = Path("/output/entry.png")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    data = source.read_bytes()
+    if len(data) > 1_048_576:
+        raise ValueError("entry.png exceeds the 1 MiB limit")
+    target.write_bytes(data)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
