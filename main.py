@@ -1,17 +1,23 @@
-"""Copy the bundled passport image to the output location."""
+"""Emit the bundled passport spread image to the grading output slot.
+
+The spread shows an Ostravian passport whose issuing state renamed itself
+mid-validity; entry.png is rendered by render.py and copied verbatim here.
+"""
 
 from pathlib import Path
 
+HERE = Path(__file__).resolve().parent
+SOURCE = HERE / "entry.png"
+TARGET = Path("/output/entry.png")
+SIZE_LIMIT = 1_048_576  # 1 MiB
+
 
 def main() -> None:
-    here = Path(__file__).resolve().parent
-    source = here / "entry.png"
-    target = Path("/output/entry.png")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    data = source.read_bytes()
-    if len(data) > 1_048_576:
-        raise ValueError("entry.png exceeds the 1 MiB limit")
-    target.write_bytes(data)
+    payload = SOURCE.read_bytes()
+    if len(payload) > SIZE_LIMIT:
+        raise ValueError(f"entry.png is {len(payload)} bytes, over the 1 MiB limit")
+    TARGET.parent.mkdir(parents=True, exist_ok=True)
+    TARGET.write_bytes(payload)
 
 
 if __name__ == "__main__":
