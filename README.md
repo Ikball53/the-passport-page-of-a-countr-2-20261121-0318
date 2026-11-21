@@ -4,4 +4,4 @@
 
 # The Passport Page of a Country That Does Not Exist
 
-An uncaptioned open passport spread for the invented Republic of Soravia, held by ferry officer Elena Mira Korvane. The data page, machine-readable strip, and dated stamps from Kestrel Isles, Tavaria, and Mirland all agree with the 2021 issue date, and the maritime-only endorsement quietly reveals an island nation that moves by sea.
+An uncaptioned open passport spread for the invented Republic of Ostravia, held by freight driver Marek Dusan Vey. The document was issued in 2022 under the old state name, but the state renamed itself the Republic of Ostra in 2024 — so the bearer's own Karst Pass border stamps switch from OSTRAVIA to OSTRA mid-validity while the data page never changed.
